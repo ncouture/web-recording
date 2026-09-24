@@ -1,0 +1,80 @@
+name: Release Automation
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Run Release Please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  build-and-attach-assets:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout released code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run typecheck
+        run: npm run typecheck
+
+      - name: Build dual targets (PWA & Extension)
+        run: npm run build:all
+
+      - name: Package Release Bundles
+        run: |
+          TAG="${{ needs.release-please.outputs.tag_name }}"
+          PWA_ARCHIVE="voicestudio-pwa-${TAG}.zip"
+          EXT_ARCHIVE="voicestudio-extension-${TAG}.zip"
+
+          # Package PWA bundle
+          (cd dist/pwa && zip -r "../../${PWA_ARCHIVE}" .)
+
+          # Package Chrome Extension bundle (ready for Chrome Web Store upload & unpacked loading)
+          (cd dist/extension && zip -r "../../${EXT_ARCHIVE}" .)
+
+          # Generate cryptographic SHA256 checksums
+          sha256sum "${PWA_ARCHIVE}" "${EXT_ARCHIVE}" > checksums.sha256
+          cat checksums.sha256
+
+      - name: Upload Release Assets to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.release-please.outputs.tag_name }}"
+          gh release upload "${TAG}" \
+            "voicestudio-pwa-${TAG}.zip" \
+            "voicestudio-extension-${TAG}.zip" \
+            checksums.sha256 \
+            --clobber
