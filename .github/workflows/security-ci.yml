@@ -1,0 +1,52 @@
+name: Security and Build Verification
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Build PWA Target
+        run: npm run build:pwa
+
+      - name: Build Extension Target
+        run: npm run build:extension
+
+      - name: Verify PWA Distribution Integrity
+        run: |
+          test -f dist/pwa/index.html
+          test -f dist/pwa/manifest.webmanifest
+          test -f dist/pwa/sw-pwa.js
+          test -f dist/pwa/icons/icon-192.png
+
+      - name: Verify Extension Distribution Integrity (MV3)
+        run: |
+          test -f dist/extension/index.html
+          test -f dist/extension/manifest.json
+          test -f dist/extension/background.js
+          test -f dist/extension/icons/icon-128.png
+          # Ensure no inline script tags are in extension HTML
+          if grep -q "<script>" dist/extension/index.html; then
+            echo "ERROR: Found inline <script> in extension HTML, violating MV3 CSP!"
+            exit 1
+          fi

@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Voice Actions Studio - Audio Recorder PWA</title>
+  
+  <!-- Modern Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81'
+            }
+          },
+          animation: {
+            'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'ripple': 'ripple 1.6s ease-out infinite'
+          },
+          keyframes: {
+            ripple: {
+              '0%': { transform: 'scale(0.8)', opacity: '1' },
+              '100%': { transform: 'scale(2.2)', opacity: '0' }
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Inter Google Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #090d16;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+
+    /* Range slider styling */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: #1e293b;
+      border-radius: 9999px;
+      height: 6px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #818cf8;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+      transition: transform 0.15s ease;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.25);
+    }
+  </style>
+</head>
+
+<body class="h-full flex flex-col antialiased selection:bg-brand-500 selection:text-white pb-28 md:pb-24">
+  
+  <header class="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 sm:px-6">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 text-white shadow-lg shadow-brand-500/20">
+          <i data-lucide="mic" class="w-5 h-5"></i>
+          <span id="recordingBadge" class="hidden absolute -top-1 -right-1 flex h-3 w-3">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+          </span>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">VoiceStudio PWA</h1>
+            <span class="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20">
+              Actions &amp; SSML
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Persistent In-Browser Audio Capture &amp; Assistant Playback</p>
+        </div>
+      </div>
+
+      <!-- Action items & Storage status -->
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <button id="storageStatusBtn" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700/80 text-slate-300 border border-slate-700/50 transition">
+          <i data-lucide="database" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span id="storageSummaryText">Storage Check</span>
+        </button>
+
+        <button id="pwaInstallBtn" class="hidden items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-md shadow-brand-600/30 transition">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Install PWA</span>
+          <span class="sm:hidden">Install</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+    
+    <!-- Top Navigation Tabs -->
+    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+      <nav class="flex space-x-2" aria-label="Tabs">
+        <button id="tabRecord" class="flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500/20 text-brand-400 border border-brand-500/30 transition">
+          <i data-lucide="disc" class="w-4 h-4"></i>
+          <span>Studio Recorder</span>
+        </button>
+        <button id="tabRecordings" class="flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i data-lucide="list-music" class="w-4 h-4"></i>
+          <span>Recordings</span>
+          <span id="recordingsCountBadge" class="ml-1 text-[11px] px-2 py-0.2 rounded-full bg-slate-800 text-slate-300 border border-slate-700">0</span>
+        </button>
+      </nav>
+
+      <!-- Assistant Limit Indicator -->
+      <div class="hidden sm:flex items-center space-x-2 text-xs text-slate-400">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span>Actions on Google compliant (OGG/WebM Opus, &le;240s)</span>
+      </div>
+    </div>
+
+    <section id="viewStudio" class="space-y-6 transition-all duration-300">
+      
+      <!-- Top banner for Storage Persistence Permission -->
+      <div id="storagePermissionBanner" class="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner">
+        <div class="flex items-start sm:items-center space-x-3">
+          <div class="p-2 rounded-xl bg-indigo-600/20 text-indigo-400 shrink-0">
+            <i data-lucide="shield-check" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h2 class="text-sm font-semibold text-indigo-200">Local Browser Storage Permission</h2>
+            <p class="text-xs text-indigo-300/70">Enable persistent quota to keep voice clips protected against automatic browser cache eviction.</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2 shrink-0">
+          <button id="grantStorageBtn" class="w-full sm:w-auto px-4 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow transition">
+            Grant Persistent Storage
+          </button>
+        </div>
+      </div>
+
+      <!-- Recorder Card -->
+      <div class="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800/90 shadow-2xl p-6 sm:p-8">
+        
+        <!-- Live Visualizer Canvas Container -->
+        <div class="relative w-full h-40 sm:h-48 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col items-center justify-center overflow-hidden">
+          <canvas id="waveformCanvas" class="w-full h-full block"></canvas>
+          
+          <!-- Idle hint overlay -->
+          <div id="visualizerIdleHint" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-slate-500 space-y-2">
+            <i data-lucide="sound-wave" class="w-8 h-8 opacity-40"></i>
+            <span class="text-xs font-medium tracking-wide">Press Record to activate audio meter</span>
+          </div>
+
+          <!-- Live decibel & audio frequency badge -->
+          <div id="liveStatsBadge" class="hidden absolute top-3 left-3 flex items-center space-x-2 px-2.5 py-1 rounded-md bg-slate-900/90 border border-slate-700/60 text-[11px] font-mono text-slate-300">
+            <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+            <span id="liveDbText">-inf dB</span>
+            <span class="text-slate-600">|</span>
+            <span id="liveFreqText">48kHz Opus</span>
+          </div>
+
+          <!-- SSML 240s Countdown indicator -->
+          <div id="ssmlTimerBadge" class="hidden absolute top-3 right-3 flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-slate-900/90 border border-slate-700/60 text-[11px] font-mono text-amber-300">
+            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+            <span id="ssmlRemainingText">240s limit</span>
+          </div>
+        </div>
+
+        <!-- Timer & Recording Status Indicator -->
+        <div class="mt-8 flex flex-col items-center justify-center space-y-4 text-center">
+          <div class="space-y-1">
+            <div id="timerDisplay" class="text-4xl sm:text-5xl font-mono font-bold tracking-tight text-white">00:00.0</div>
+            <div id="recordingStatusText" class="text-xs font-medium uppercase tracking-widest text-slate-400">
+              Ready to Capture
+            </div>
+          </div>
+
+          <!-- Primary Control Action Buttons -->
+          <div class="flex items-center justify-center space-x-4 pt-2">
+            
+            <!-- Pause / Resume Button -->
+            <button id="pauseRecordBtn" disabled class="p-3.5 rounded-2xl bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-700 border border-slate-700 transition" title="Pause/Resume">
+              <i data-lucide="pause" id="pauseBtnIcon" class="w-5 h-5"></i>
+            </button>
+
+            <!-- Main Record / Stop Circle -->
+            <div class="relative flex items-center justify-center">
+              <div id="recordRingGlow" class="hidden absolute -inset-2 rounded-full bg-red-600/30 blur-lg animate-ripple"></div>
+              <button id="toggleRecordBtn" class="relative z-10 w-20 h-20 rounded-full bg-gradient-to-tr from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 text-white flex items-center justify-center shadow-xl shadow-red-600/40 hover:scale-105 active:scale-95 transition-all">
+                <i data-lucide="mic" id="recordBtnIcon" class="w-8 h-8"></i>
+              </button>
+            </div>
+
+            <!-- Cancel / Discard Button -->
+            <button id="discardRecordBtn" disabled class="p-3.5 rounded-2xl bg-slate-800 text-slate-400 hover:text-red-400 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-700 border border-slate-700 transition" title="Discard">
+              <i data-lucide="trash-2" class="w-5 h-5"></i>
+            </button>
+          </div>
+
+          <!-- Configuration and Mode Settings -->
+          <div class="w-full max-w-md pt-6 border-t border-slate-800/80 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-400">
+            <label class="flex items-center space-x-2 cursor-pointer select-none">
+              <input type="checkbox" id="ssmlLimitToggle" checked class="w-4 h-4 rounded text-brand-500 bg-slate-800 border-slate-700 focus:ring-0">
+              <span>Actions on Google 240s Auto-stop</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer select-none">
+              <input type="checkbox" id="noiseSuppressionToggle" checked class="w-4 h-4 rounded text-brand-500 bg-slate-800 border-slate-700 focus:ring-0">
+              <span>Speech Noise Suppression</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Tips & Protocol Info -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/60 space-y-1.5">
+          <div class="flex items-center space-x-2 text-indigo-400 text-xs font-semibold uppercase tracking-wider">
+            <i data-lucide="cpu" class="w-4 h-4"></i>
+            <span>Pure Client-Side</span>
+          </div>
+          <p class="text-xs text-slate-400">Uses HTML5 MediaStream &amp; Web Audio API. No legacy Flash or NPAPI plugins needed.</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/60 space-y-1.5">
+          <div class="flex items-center space-x-2 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
+            <i data-lucide="hard-drive-download" class="w-4 h-4"></i>
+            <span>Local IndexedDB</span>
+          </div>
+          <p class="text-xs text-slate-400">Audio blobs are saved directly into your browser's persistent storage sandbox.</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/60 space-y-1.5">
+          <div class="flex items-center space-x-2 text-amber-400 text-xs font-semibold uppercase tracking-wider">
+            <i data-lucide="code-xml" class="w-4 h-4"></i>
+            <span>SSML Ready</span>
+          </div>
+          <p class="text-xs text-slate-400">Instantly generate ready-to-use <code>&lt;audio src="..."&gt;</code> SSML tags for voice assistant actions.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="viewRecordings" class="hidden space-y-6">
+      <!-- Search & Filters Toolbar -->
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div class="relative flex-1">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+          <input type="text" id="searchRecordingsInput" placeholder="Filter voice clips..." class="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500 transition">
+        </div>
+        <div class="flex items-center space-x-2">
+          <button id="refreshRecordingsBtn" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition" title="Refresh List">
+            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+          </button>
+          <button id="clearAllRecordingsBtn" class="px-3 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-800/40 text-xs font-medium text-red-300 transition flex items-center space-x-1.5">
+            <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+            <span>Delete All</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Recordings Container List -->
+      <div id="recordingsList" class="space-y-3">
+        <!-- Dynamic recording cards will be injected here -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyRecordingsState" class="hidden flex flex-col items-center justify-center p-12 text-center rounded-2xl bg-slate-900/40 border border-dashed border-slate-800 space-y-3">
+        <div class="p-4 rounded-full bg-slate-800/60 text-slate-500">
+          <i data-lucide="mic-off" class="w-8 h-8"></i>
+        </div>
+        <div class="space-y-1">
+          <h3 class="text-sm font-semibold text-slate-300">No voice recordings stored yet</h3>
+          <p class="text-xs text-slate-500 max-w-sm">Switch to the Studio Recorder tab and capture your first audio clip.</p>
+        </div>
+        <button id="goToStudioBtn" class="mt-2 px-4 py-2 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white transition">
+          Launch Recorder
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <aside id="audioPlayerDock" class="fixed bottom-0 inset-x-0 z-50 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 px-4 py-3 sm:px-6 shadow-2xl transition-transform duration-300 translate-y-full">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-6">
+      
+      <!-- Track Details & SSML indicator -->
+      <div class="flex items-center space-x-3 w-full sm:w-1/4 min-w-0">
+        <div class="w-10 h-10 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center shrink-0 border border-brand-500/30">
+          <i data-lucide="music" class="w-5 h-5"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+          <h4 id="playerTrackTitle" class="text-xs sm:text-sm font-semibold text-white truncate">Select a clip</h4>
+          <p id="playerTrackMeta" class="text-[11px] text-slate-400 truncate">00:00 &bull; Audio</p>
+        </div>
+      </div>
+
+      <!-- Scrubber & Playback Controls -->
+      <div class="flex flex-col items-center w-full sm:w-2/4 space-y-1.5">
+        <div class="flex items-center space-x-4">
+          <button id="playerSkipBackBtn" class="text-slate-400 hover:text-white transition" title="Rewind 5s">
+            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+          </button>
+          <button id="playerPlayBtn" class="w-9 h-9 rounded-full bg-brand-600 hover:bg-brand-500 text-white flex items-center justify-center shadow-md shadow-brand-600/30 transition">
+            <i data-lucide="play" id="playerPlayIcon" class="w-4 h-4 ml-0.5"></i>
+          </button>
+          <button id="playerSkipFwdBtn" class="text-slate-400 hover:text-white transition" title="Forward 5s">
+            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- Progress Timeline slider -->
+        <div class="flex items-center space-x-2.5 w-full">
+          <span id="playerCurrentTime" class="text-[10px] font-mono text-slate-400 w-8 text-right">0:00</span>
+          <input type="range" id="playerProgressSlider" min="0" max="100" value="0" step="0.1" class="w-full flex-1">
+          <span id="playerDuration" class="text-[10px] font-mono text-slate-400 w-8">0:00</span>
+        </div>
+      </div>
+
+      <!-- Volume, Speed, and Close Dock -->
+      <div class="flex items-center justify-end space-x-3 w-full sm:w-1/4">
+        <!-- Speed chip -->
+        <button id="playerSpeedBtn" class="px-2 py-1 rounded text-[11px] font-mono font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+          1.0x
+        </button>
+
+        <!-- Volume Mute toggle & Slider -->
+        <div class="hidden sm:flex items-center space-x-1.5">
+          <button id="playerMuteBtn" class="text-slate-400 hover:text-white">
+            <i data-lucide="volume-2" id="playerVolumeIcon" class="w-4 h-4"></i>
+          </button>
+          <input type="range" id="playerVolumeSlider" min="0" max="1" step="0.05" value="1" class="w-16">
+        </div>
+
+        <!-- Close Dock button -->
+        <button id="playerCloseBtn" class="text-slate-500 hover:text-slate-300 p-1" title="Close player">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Storage Inspection Modal -->
+  <div id="storageModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+    <div class="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2 text-indigo-400">
+          <i data-lucide="hard-drive" class="w-5 h-5"></i>
+          <h3 class="text-base font-semibold text-white">Browser Storage Status</h3>
+        </div>
+        <button id="closeStorageModalBtn" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400">Persistence Status:</span>
+            <span id="modalPersistStatusBadge" class="font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">Checking...</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400">Storage Used:</span>
+            <span id="modalStorageUsed" class="font-mono text-slate-200">0 MB</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400">Storage Quota:</span>
+            <span id="modalStorageQuota" class="font-mono text-slate-200">Unknown</span>
+          </div>
+          <!-- Progress bar -->
+          <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            <div id="modalStorageBar" class="bg-indigo-500 h-full w-0 transition-all duration-300"></div>
+          </div>
+        </div>
+
+        <p class="text-slate-400 leading-relaxed">
+          Google Chrome, Safari, and Firefox provide persistent client storage via the StorageManager API. When enabled, your voice recordings will not be purged during low disk space cleans.
+        </p>
+      </div>
+
+      <div class="flex items-center justify-end space-x-2 pt-2">
+        <button id="requestPersistActionBtn" class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition">
+          Request Full Persistence
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Confirmation Dialog (Replaces native confirm()) -->
+  <div id="confirmDialog" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div class="w-full max-w-sm rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4">
+      <div class="flex items-center space-x-3 text-amber-400">
+        <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+        <h4 id="confirmDialogTitle" class="text-sm font-bold text-white">Confirmation</h4>
+      </div>
+      <p id="confirmDialogMessage" class="text-xs text-slate-300 leading-relaxed"></p>
+      <div class="flex items-center justify-end space-x-2 pt-2">
+        <button id="confirmCancelBtn" class="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          Cancel
+        </button>
+        <button id="confirmProceedBtn" class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-500 text-white shadow transition">
+          Proceed
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Prompt Modal for Renaming Clip -->
+  <div id="promptModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div class="w-full max-w-sm rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4">
+      <h4 id="promptModalTitle" class="text-sm font-bold text-white">Rename Recording</h4>
+      <input type="text" id="promptModalInput" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-200 focus:outline-none focus:border-brand-500">
+      <div class="flex items-center justify-end space-x-2 pt-2">
+        <button id="promptCancelBtn" class="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          Cancel
+        </button>
+        <button id="promptSubmitBtn" class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white transition">
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Toast Notification System -->
+  <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <script>
+    // Create and install dynamic PWA manifest for standalone home screen installability
+    (function setupPWA() {
+      const pwaManifest = {
+        name: "VoiceStudio Actions on Google PWA",
+        short_name: "VoiceStudio",
+        description: "Standalone audio recording PWA compliant with voice assistant and SSML standards.",
+        start_url: "./",
+        display: "standalone",
+        background_color: "#020617",
+        theme_color: "#4f46e5",
+        icons: [
+          {
+            src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236366f1'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath fill='%23ffffff' d='M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V20H9v2h6v-2h-2v-2.08A7 7 0 0 0 19 11h-2z'/%3E%3C/svg%3E",
+            sizes: "192x192 512x512",
+            type: "image/svg+xml",
+            purpose: "any maskable"
+          }
+        ]
+      };
+      
+      const manifestBlob = new Blob([JSON.stringify(pwaManifest)], { type: 'application/manifest+json' });
+      const manifestUrl = URL.createObjectURL(manifestBlob);
+      const linkTag = document.createElement('link');
+      linkTag.rel = 'manifest';
+      linkTag.href = manifestUrl;
+      document.head.appendChild(linkTag);
+
+      // Register an inline caching service worker for genuine PWA qualification
+      if ('serviceWorker' in navigator) {
+        const swScript = `
+          const CACHE_NAME = 'voicestudio-cache-v1';
+          self.addEventListener('install', (e) => {
+            self.skipWaiting();
+          });
+          self.addEventListener('activate', (e) => {
+            e.waitUntil(clients.claim());
+          });
+          self.addEventListener('fetch', (e) => {
+            // Default network-first with cache fallback
+            e.respondWith(
+              fetch(e.request).catch(() => caches.match(e.request))
+            );
+          });
+        `;
+        const swBlob = new Blob([swScript], { type: 'application/javascript' });
+        navigator.serviceWorker.register(URL.createObjectURL(swBlob))
+          .catch((err) => console.debug('SW Notice:', err.message));
+      }
+
+      // Handle beforeinstallprompt event for custom install button
+      let deferredInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredInstallPrompt = e;
+        const installBtn = document.getElementById('pwaInstallBtn');
+        if (installBtn) {
+          installBtn.classList.remove('hidden');
+          installBtn.classList.add('flex');
+          installBtn.addEventListener('click', async () => {
+            if (deferredInstallPrompt) {
+              deferredInstallPrompt.prompt();
+              const { outcome } = await deferredInstallPrompt.userChoice;
+              if (outcome === 'accepted') {
+                installBtn.classList.add('hidden');
+              }
+              deferredInstallPrompt = null;
+            }
+          });
+        }
+      });
+    })();
+  </script>
+
+  <script>
+    const DB_NAME = 'VoiceStudioAudioDB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'recordings';
+
+    class StorageRepository {
+      constructor() {
+        this.db = null;
+      }
+
+      async init() {
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(DB_NAME, DB_VERSION);
+          request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+              const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+              store.createIndex('timestamp', 'timestamp', { unique: false });
+            }
+          };
+          request.onsuccess = (event) => {
+            this.db = event.target.result;
+            resolve(this.db);
+          };
+          request.onerror = (event) => {
+            console.error('IndexedDB Error:', event.target.error);
+            reject(event.target.error);
+          };
+        });
+      }
+
+      async saveRecording(record) {
+        await this.ensureReady();
+        return new Promise((resolve, reject) => {
+          const tx = this.db.transaction([STORE_NAME], 'readwrite');
+          const store = tx.objectStore(STORE_NAME);
+          const req = store.put(record);
+          req.onsuccess = () => resolve(record);
+          req.onerror = () => reject(req.error);
+        });
+      }
+
+      async getAllRecordings() {
+        await this.ensureReady();
+        return new Promise((resolve, reject) => {
+          const tx = this.db.transaction([STORE_NAME], 'readonly');
+          const store = tx.objectStore(STORE_NAME);
+          const index = store.index('timestamp');
+          const req = index.getAll();
+          req.onsuccess = () => {
+            // Sort newest first
+            const results = (req.result || []).sort((a, b) => b.timestamp - a.timestamp);
+            resolve(results);
+          };
+          req.onerror = () => reject(req.error);
+        });
+      }
+
+      async getRecording(id) {
+        await this.ensureReady();
+        return new Promise((resolve, reject) => {
+          const tx = this.db.transaction([STORE_NAME], 'readonly');
+          const store = tx.objectStore(STORE_NAME);
+          const req = store.get(id);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      }
+
+      async deleteRecording(id) {
+        await this.ensureReady();
+        return new Promise((resolve, reject) => {
+          const tx = this.db.transaction([STORE_NAME], 'readwrite');
+          const store = tx.objectStore(STORE_NAME);
+          const req = store.delete(id);
+          req.onsuccess = () => resolve(true);
+          req.onerror = () => reject(req.error);
+        });
+      }
+
+      async clearAll() {
+        await this.ensureReady();
+        return new Promise((resolve, reject) => {
+          const tx = this.db.transaction([STORE_NAME], 'readwrite');
+          const store = tx.objectStore(STORE_NAME);
+          const req = store.clear();
+          req.onsuccess = () => resolve(true);
+          req.onerror = () => reject(req.error);
+        });
+      }
+
+      async ensureReady() {
+        if (!this.db) {
+          await this.init();
+        }
+      }
+    }
+
+    const dbRepo = new StorageRepository();
+
+    const StorageManagerHelper = {
+      async checkPersistence() {
+        if (navigator.storage && navigator.storage.persisted) {
+          return await navigator.storage.persisted();
+        }
+        return false;
+      },
+
+      async requestPersistence() {
+        if (navigator.storage && navigator.storage.persist) {
+          const granted = await navigator.storage.persist();
+          return granted;
+        }
+        return false;
+      },
+
+      async getEstimate() {
+        if (navigator.storage && navigator.storage.estimate) {
+          return await navigator.storage.estimate();
+        }
+        return { quota: 0, usage: 0 };
+      }
+    };
+  </script>
+
+  <script>
+    class AudioCaptureEngine {
+      constructor({ onTick, onVisualData, onStateChange, onAutoStop }) {
+        this.onTick = onTick;
+        this.onVisualData = onVisualData;
+        this.onStateChange = onStateChange;
+        this.onAutoStop = onAutoStop;
+
+        this.mediaStream = null;
+        this.mediaRecorder = null;
+        this.audioContext = null;
+        this.analyser = null;
+        this.sourceNode = null;
+        this.javascriptNode = null;
+
+        this.audioChunks = [];
+        this.startTime = 0;
+        this.elapsedTime = 0;
+        this.timerInterval = null;
+        this.visualizerRafId = null;
+
+        this.isRecording = false;
+        this.isPaused = false;
+        this.maxDurationSeconds = 240; // 240 seconds SSML ceiling
+        this.enforceSSML = true;
+      }
+
+      // Detect best modern MIME type (Opus in OGG/WebM is standard for Actions on Google)
+      getSupportedMimeType() {
+        const candidateTypes = [
+          'audio/webm;codecs=opus',
+          'audio/ogg;codecs=opus',
+          'audio/webm',
+          'audio/ogg',
+          'audio/mp4'
+        ];
+        for (const type of candidateTypes) {
+          if (window.MediaRecorder && MediaRecorder.isTypeSupported(type)) {
+            return type;
+          }
+        }
+        return '';
+      }
+
+      async startRecording(enforceSSML = true, noiseSuppression = true) {
+        this.enforceSSML = enforceSSML;
+        this.audioChunks = [];
+        this.elapsedTime = 0;
+
+        // Obtain microhone stream with acoustic enhancements
+        this.mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 1, // Voice recording optimal in mono for Assistant SSML
+            sampleRate: 48000,
+            echoCancellation: true,
+            noiseSuppression: noiseSuppression,
+            autoGainControl: true
+          }
+        });
+
+        // Initialize AudioContext & AnalyserNode for live visualizer
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        this.audioContext = new AudioCtx();
+        if (this.audioContext.state === 'suspended') {
+          await this.audioContext.resume();
+        }
+
+        this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
+        this.analyser = this.audioContext.createAnalyser();
+        this.analyser.fftSize = 256;
+        this.analyser.smoothingTimeConstant = 0.8;
+        this.sourceNode.connect(this.analyser);
+
+        const mimeType = this.getSupportedMimeType();
+        const options = mimeType ? { mimeType, audioBitsPerSecond: 128000 } : {};
+        this.mediaRecorder = new MediaRecorder(this.mediaStream, options);
+
+        this.mediaRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            this.audioChunks.push(event.data);
+          }
+        };
+
+        this.mediaRecorder.start(250); // Emit 250ms chunks for steady streaming
+        this.startTime = Date.now();
+        this.isRecording = true;
+        this.isPaused = false;
+
+        this.startTimer();
+        this.startVisualizerLoop();
+        this.onStateChange('recording');
+      }
+
+      startTimer() {
+        clearInterval(this.timerInterval);
+        this.timerInterval = setInterval(() => {
+          if (!this.isPaused) {
+            this.elapsedTime += 100;
+            const seconds = this.elapsedTime / 1000;
+            this.onTick(this.elapsedTime);
+
+            if (this.enforceSSML && seconds >= this.maxDurationSeconds) {
+              this.stopRecording(true);
+            }
+          }
+        }, 100);
+      }
+
+      startVisualizerLoop() {
+        const bufferLength = this.analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+
+        const renderFrame = () => {
+          if (!this.isRecording) return;
+          this.analyser.getByteFrequencyData(dataArray);
+
+          // Calculate average decibel proxy
+          let sum = 0;
+          for (let i = 0; i < bufferLength; i++) {
+            sum += dataArray[i];
+          }
+          const average = sum / bufferLength;
+          this.onVisualData(dataArray, average);
+
+          this.visualizerRafId = requestAnimationFrame(renderFrame);
+        };
+        renderFrame();
+      }
+
+      pauseRecording() {
+        if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') return;
+        this.mediaRecorder.pause();
+        this.isPaused = true;
+        this.onStateChange('paused');
+      }
+
+      resumeRecording() {
+        if (!this.mediaRecorder || this.mediaRecorder.state !== 'paused') return;
+        this.mediaRecorder.resume();
+        this.isPaused = false;
+        this.onStateChange('recording');
+      }
+
+      async stopRecording(autoStopped = false) {
+        return new Promise((resolve) => {
+          if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') {
+            resolve(null);
+            return;
+          }
+
+          this.mediaRecorder.onstop = async () => {
+            clearInterval(this.timerInterval);
+            cancelAnimationFrame(this.visualizerRafId);
+
+            // Clean up audio tracks
+            if (this.mediaStream) {
+              this.mediaStream.getTracks().forEach((track) => track.stop());
+            }
+
+            const mimeType = this.mediaRecorder.mimeType || 'audio/webm';
+            const blob = new Blob(this.audioChunks, { type: mimeType });
+            const durationSec = this.elapsedTime / 1000;
+
+            // Generate waveform preview peaks
+            const peaks = await this.extractWaveformPeaks(blob);
+
+            this.isRecording = false;
+            this.isPaused = false;
+            this.onStateChange('idle');
+
+            if (autoStopped && this.onAutoStop) {
+              this.onAutoStop();
+            }
+
+            resolve({
+              blob,
+              mimeType,
+              duration: durationSec,
+              peaks
+            });
+          };
+
+          this.mediaRecorder.stop();
+        });
+      }
+
+      discardRecording() {
+        clearInterval(this.timerInterval);
+        cancelAnimationFrame(this.visualizerRafId);
+        if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+          this.mediaRecorder.onstop = null;
+          this.mediaRecorder.stop();
+        }
+        if (this.mediaStream) {
+          this.mediaStream.getTracks().forEach((track) => track.stop());
+        }
+        this.isRecording = false;
+        this.isPaused = false;
+        this.audioChunks = [];
+        this.onStateChange('idle');
+      }
+
+      async extractWaveformPeaks(blob) {
+        try {
+          const arrayBuffer = await blob.arrayBuffer();
+          const offlineContext = new (window.AudioContext || window.webkitAudioContext)();
+          const audioBuffer = await offlineContext.decodeAudioData(arrayBuffer);
+          const channelData = audioBuffer.getChannelData(0);
+          const sampleCount = 45; // Bars for card preview
+          const blockSize = Math.floor(channelData.length / sampleCount);
+          const peaks = [];
+
+          for (let i = 0; i < sampleCount; i++) {
+            let blockStart = blockSize * i;
+            let sum = 0;
+            for (let j = 0; j < blockSize; j++) {
+              sum += Math.abs(channelData[blockStart + j] || 0);
+            }
+            peaks.push(Math.min(1, (sum / blockSize) * 4)); // Boost visibility
+          }
+          return peaks;
+        } catch (err) {
+          console.warn('Peak extraction fallback:', err);
+          return Array.from({ length: 45 }, () => 0.2 + Math.random() * 0.6);
+        }
+      }
+    }
+  </script>
+
+  <script>
+    // Active player and playback state
+    let activePlayerAudio = new Audio();
+    let currentPlayingClip = null;
+    let isPlaying = false;
+    let playbackSpeed = 1.0;
+
+    // Toast helper
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      let icon = 'info';
+      let borderCol = 'border-slate-700';
+      let bgCol = 'bg-slate-900';
+      if (type === 'success') {
+        icon = 'check-circle-2';
+        borderCol = 'border-emerald-500/50';
+      } else if (type === 'warning') {
+        icon = 'alert-triangle';
+        borderCol = 'border-amber-500/50';
+      } else if (type === 'error') {
+        icon = 'x-circle';
+        borderCol = 'border-red-500/50';
+      }
+
+      toast.className = `pointer-events-auto flex items-center space-x-2.5 px-4 py-3 rounded-xl ${bgCol} text-white border ${borderCol} shadow-2xl text-xs font-medium transition-all duration-300 transform translate-y-2 opacity-0`;
+      toast.innerHTML = `
+        <i data-lucide="${icon}" class="w-4 h-4 shrink-0 text-brand-400"></i>
+        <span>${message}</span>
+      `;
+      container.appendChild(toast);
+      lucide.createIcons({ root: toast });
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // Modal dialog utilities
+    function openConfirmDialog(title, message, onProceed) {
+      const dialog = document.getElementById('confirmDialog');
+      document.getElementById('confirmDialogTitle').innerText = title;
+      document.getElementById('confirmDialogMessage').innerText = message;
+      dialog.classList.remove('hidden');
+
+      const proceedBtn = document.getElementById('confirmProceedBtn');
+      const cancelBtn = document.getElementById('confirmCancelBtn');
+
+      const cleanup = () => {
+        dialog.classList.add('hidden');
+        proceedBtn.onclick = null;
+        cancelBtn.onclick = null;
+      };
+
+      proceedBtn.onclick = () => {
+        cleanup();
+        onProceed();
+      };
+      cancelBtn.onclick = cleanup;
+    }
+
+    function openPromptModal(title, initialValue, onSubmit) {
+      const modal = document.getElementById('promptModal');
+      const input = document.getElementById('promptModalInput');
+      document.getElementById('promptModalTitle').innerText = title;
+      input.value = initialValue;
+      modal.classList.remove('hidden');
+      input.focus();
+
+      const submitBtn = document.getElementById('promptSubmitBtn');
+      const cancelBtn = document.getElementById('promptCancelBtn');
+
+      const cleanup = () => {
+        modal.classList.add('hidden');
+        submitBtn.onclick = null;
+        cancelBtn.onclick = null;
+      };
+
+      submitBtn.onclick = () => {
+        const val = input.value.trim();
+        if (val) {
+          cleanup();
+          onSubmit(val);
+        }
+      };
+      cancelBtn.onclick = cleanup;
+    }
+
+    const canvas = document.getElementById('waveformCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * window.devicePixelRatio;
+      canvas.height = rect.height * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function drawIdleVisualizer() {
+      const width = canvas.width / window.devicePixelRatio;
+      const height = canvas.height / window.devicePixelRatio;
+      ctx.clearRect(0, 0, width, height);
+
+      ctx.beginPath();
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 2;
+      ctx.moveTo(0, height / 2);
+      ctx.lineTo(width, height / 2);
+      ctx.stroke();
+    }
+    drawIdleVisualizer();
+
+    function renderActiveWaveform(dataArray, averageVolume) {
+      const width = canvas.width / window.devicePixelRatio;
+      const height = canvas.height / window.devicePixelRatio;
+      ctx.clearRect(0, 0, width, height);
+
+      const bufferLength = dataArray.length;
+      const barWidth = (width / bufferLength) * 2.2;
+      let x = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        const barHeight = (dataArray[i] / 255) * (height * 0.85);
+
+        // Gradient for dynamic audio spectrum
+        const gradient = ctx.createLinearGradient(0, height / 2 - barHeight / 2, 0, height / 2 + barHeight / 2);
+        gradient.addColorStop(0, '#818cf8');
+        gradient.addColorStop(0.5, '#6366f1');
+        gradient.addColorStop(1, '#4338ca');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, (height - barHeight) / 2, barWidth - 1, barHeight);
+        x += barWidth;
+      }
+
+      // Update decibel badge
+      const db = Math.round((averageVolume / 255) * 60 - 60);
+      document.getElementById('liveDbText').innerText = `${db} dB`;
+    }
+
+    const captureEngine = new AudioCaptureEngine({
+      onTick: (elapsedMs) => {
+        const totalSeconds = Math.floor(elapsedMs / 1000);
+        const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+        const secs = String(totalSeconds % 60).padStart(2, '0');
+        const tenths = Math.floor((elapsedMs % 1000) / 100);
+        document.getElementById('timerDisplay').innerText = `${mins}:${secs}.${tenths}`;
+
+        if (captureEngine.enforceSSML) {
+          const remaining = Math.max(0, 240 - totalSeconds);
+          document.getElementById('ssmlRemainingText').innerText = `${remaining}s left`;
+        }
+      },
+      onVisualData: (dataArray, avg) => {
+        renderActiveWaveform(dataArray, avg);
+      },
+      onStateChange: (state) => {
+        updateRecorderUI(state);
+      },
+      onAutoStop: () => {
+        showToast('Actions on Google SSML limit (240s) reached. Audio saved!', 'info');
+      }
+    });
+
+    function updateRecorderUI(state) {
+      const toggleBtn = document.getElementById('toggleRecordBtn');
+      const pauseBtn = document.getElementById('pauseRecordBtn');
+      const discardBtn = document.getElementById('discardRecordBtn');
+      const glow = document.getElementById('recordRingGlow');
+      const idleHint = document.getElementById('visualizerIdleHint');
+      const liveBadge = document.getElementById('liveStatsBadge');
+      const ssmlBadge = document.getElementById('ssmlTimerBadge');
+      const badge = document.getElementById('recordingBadge');
+      const statusText = document.getElementById('recordingStatusText');
+      const recordIcon = document.getElementById('recordBtnIcon');
+
+      if (state === 'recording') {
+        toggleBtn.classList.remove('from-red-600', 'to-rose-500');
+        toggleBtn.classList.add('from-indigo-600', 'to-brand-500');
+        recordIcon.setAttribute('data-lucide', 'square');
+        pauseBtn.disabled = false;
+        discardBtn.disabled = false;
+        glow.classList.remove('hidden');
+        idleHint.classList.add('hidden');
+        liveBadge.classList.remove('hidden');
+        if (captureEngine.enforceSSML) ssmlBadge.classList.remove('hidden');
+        badge.classList.remove('hidden');
+        statusText.innerText = 'Capturing Voice Clip...';
+        statusText.classList.add('text-red-400');
+      } else if (state === 'paused') {
+        recordIcon.setAttribute('data-lucide', 'square');
+        glow.classList.add('hidden');
+        statusText.innerText = 'Recording Paused';
+        statusText.classList.remove('text-red-400');
+        document.getElementById('pauseBtnIcon').setAttribute('data-lucide', 'play');
+      } else {
+        // Idle
+        toggleBtn.classList.add('from-red-600', 'to-rose-500');
+        toggleBtn.classList.remove('from-indigo-600', 'to-brand-500');
+        recordIcon.setAttribute('data-lucide', 'mic');
+        pauseBtn.disabled = true;
+        discardBtn.disabled = true;
+        glow.classList.add('hidden');
+        idleHint.classList.remove('hidden');
+        liveBadge.classList.add('hidden');
+        ssmlBadge.classList.add('hidden');
+        badge.classList.add('hidden');
+        statusText.innerText = 'Ready to Capture';
+        statusText.classList.remove('text-red-400');
+        document.getElementById('pauseBtnIcon').setAttribute('data-lucide', 'pause');
+        drawIdleVisualizer();
+      }
+      lucide.createIcons();
+    }
+
+    const toggleRecordBtn = document.getElementById('toggleRecordBtn');
+    const pauseRecordBtn = document.getElementById('pauseRecordBtn');
+    const discardRecordBtn = document.getElementById('discardRecordBtn');
+
+    toggleRecordBtn.addEventListener('click', async () => {
+      if (!captureEngine.isRecording) {
+        try {
+          const ssmlEnabled = document.getElementById('ssmlLimitToggle').checked;
+          const noiseEnabled = document.getElementById('noiseSuppressionToggle').checked;
+          await captureEngine.startRecording(ssmlEnabled, noiseEnabled);
+          showToast('Recording started', 'info');
+        } catch (err) {
+          console.error('Mic access error:', err);
+          showToast('Microphone permission required: ' + err.message, 'error');
+        }
+      } else {
+        // Stop and persist to IndexedDB
+        const result = await captureEngine.stopRecording();
+        if (result && result.blob) {
+          const timestamp = Date.now();
+          const defaultTitle = `Voice Note ${new Date(timestamp).toLocaleDateString()} ${new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+          
+          const record = {
+            id: 'rec_' + timestamp + '_' + Math.random().toString(36).substring(2, 7),
+            title: defaultTitle,
+            blob: result.blob,
+            mimeType: result.mimeType,
+            duration: result.duration,
+            timestamp: timestamp,
+            size: result.blob.size,
+            peaks: result.peaks
+          };
+
+          await dbRepo.saveRecording(record);
+          showToast('Recording stored in local browser database!', 'success');
+          document.getElementById('timerDisplay').innerText = '00:00.0';
+          await updateRecordingsView();
+          await refreshStorageStatus();
+        }
+      }
+    });
+
+    pauseRecordBtn.addEventListener('click', () => {
+      if (!captureEngine.isRecording) return;
+      if (captureEngine.isPaused) {
+        captureEngine.resumeRecording();
+        document.getElementById('pauseBtnIcon').setAttribute('data-lucide', 'pause');
+      } else {
+        captureEngine.pauseRecording();
+        document.getElementById('pauseBtnIcon').setAttribute('data-lucide', 'play');
+      }
+      lucide.createIcons();
+    });
+
+    discardRecordBtn.addEventListener('click', () => {
+      openConfirmDialog(
+        'Discard Recording?',
+        'This will cancel and erase the current active audio capture buffer.',
+        () => {
+          captureEngine.discardRecording();
+          document.getElementById('timerDisplay').innerText = '00:00.0';
+          showToast('Recording discarded', 'warning');
+        }
+      );
+    });
+
+    async function updateRecordingsView(query = '') {
+      const recordings = await dbRepo.getAllRecordings();
+      const listContainer = document.getElementById('recordingsList');
+      const emptyState = document.getElementById('emptyRecordingsState');
+      const countBadge = document.getElementById('recordingsCountBadge');
+
+      countBadge.innerText = recordings.length;
+
+      const filtered = recordings.filter((r) => r.title.toLowerCase().includes(query.toLowerCase()));
+
+      if (filtered.length === 0) {
+        listContainer.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      listContainer.innerHTML = '';
+
+      filtered.forEach((rec) => {
+        const card = createRecordingCard(rec);
+        listContainer.appendChild(card);
+      });
+
+      lucide.createIcons();
+    }
+
+    function formatDuration(sec) {
+      const s = Math.floor(sec || 0);
+      const mins = Math.floor(s / 60);
+      const secs = s % 60;
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function createRecordingCard(rec) {
+      const card = document.createElement('div');
+      card.className = 'group p-4 rounded-2xl bg-slate-900 border border-slate-800/80 hover:border-slate-700 transition flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shadow-sm';
+
+      const isCurrentActive = currentPlayingClip && currentPlayingClip.id === rec.id && isPlaying;
+
+      // Peak bars visualizer HTML
+      const peaks = rec.peaks || Array.from({ length: 45 }, () => 0.3);
+      const peakBarsHtml = peaks.map((p) => {
+        const heightPct = Math.max(12, Math.round(p * 100));
+        return `<div class="w-1 rounded-full bg-slate-700 group-hover:bg-brand-500/50 transition" style="height: ${heightPct}%"></div>`;
+      }).join('');
+
+      card.innerHTML = `
+        <div class="flex items-center space-x-3.5 flex-1 min-w-0">
+          <button class="play-card-btn w-11 h-11 rounded-xl ${isCurrentActive ? 'bg-brand-500 text-white' : 'bg-slate-800 text-brand-400 group-hover:bg-brand-500/20'} flex items-center justify-center shrink-0 transition" title="Play Clip">
+            <i data-lucide="${isCurrentActive ? 'pause' : 'play'}" class="w-5 h-5 ${isCurrentActive ? '' : 'ml-0.5'}"></i>
+          </button>
+          
+          <div class="space-y-1 min-w-0 flex-1">
+            <div class="flex items-center space-x-2">
+              <h4 class="text-sm font-semibold text-white truncate clip-title">${rec.title}</h4>
+              <span class="text-[10px] font-mono px-2 py-0.2 rounded-md bg-slate-800 text-slate-400 border border-slate-700/60 uppercase">
+                ${rec.mimeType.includes('ogg') ? 'OGG' : 'WebM'}
+              </span>
+            </div>
+
+            <!-- Waveform peek display -->
+            <div class="h-6 w-full max-w-xs flex items-center space-x-0.5 py-1">
+              ${peakBarsHtml}
+            </div>
+
+            <div class="flex items-center space-x-3 text-xs text-slate-400">
+              <span class="font-mono text-slate-300">${formatDuration(rec.duration)}</span>
+              <span>&bull;</span>
+              <span>${formatBytes(rec.size)}</span>
+              <span>&bull;</span>
+              <span class="text-[11px]">${new Date(rec.timestamp).toLocaleDateString()}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action tools -->
+        <div class="flex items-center space-x-1 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/80 justify-end">
+          
+          <!-- Copy SSML Tag Button (Actions on Google requirement) -->
+          <button class="copy-ssml-btn p-2 rounded-xl text-slate-400 hover:text-indigo-300 hover:bg-slate-800 transition" title="Copy Actions on Google SSML Tag">
+            <i data-lucide="code" class="w-4 h-4"></i>
+          </button>
+
+          <!-- Download Audio file -->
+          <button class="download-btn p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition" title="Export Audio File">
+            <i data-lucide="download" class="w-4 h-4"></i>
+          </button>
+
+          <!-- Rename Button -->
+          <button class="rename-btn p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition" title="Rename Note">
+            <i data-lucide="edit-3" class="w-4 h-4"></i>
+          </button>
+
+          <!-- Delete Clip -->
+          <button class="delete-btn p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-slate-800 transition" title="Delete Note">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        </div>
+      `;
+
+      // Event handlers for card actions
+      card.querySelector('.play-card-btn').onclick = () => togglePlayClip(rec);
+      card.querySelector('.download-btn').onclick = () => downloadClip(rec);
+      card.querySelector('.copy-ssml-btn').onclick = () => copySSMLTag(rec);
+      card.querySelector('.rename-btn').onclick = () => renameClip(rec);
+      card.querySelector('.delete-btn').onclick = () => deleteClip(rec);
+
+      return card;
+    }
+
+    function togglePlayClip(record) {
+      if (currentPlayingClip && currentPlayingClip.id === record.id) {
+        if (isPlaying) {
+          activePlayerAudio.pause();
+        } else {
+          activePlayerAudio.play();
+        }
+        return;
+      }
+
+      // New track to load
+      currentPlayingClip = record;
+      const audioUrl = URL.createObjectURL(record.blob);
+      activePlayerAudio.src = audioUrl;
+      activePlayerAudio.playbackRate = playbackSpeed;
+
+      // Update Dock Player elements
+      document.getElementById('playerTrackTitle').innerText = record.title;
+      document.getElementById('playerTrackMeta').innerText = `${formatDuration(record.duration)} • ${record.mimeType}`;
+      document.getElementById('playerDuration').innerText = formatDuration(record.duration);
+      document.getElementById('audioPlayerDock').classList.remove('translate-y-full');
+
+      activePlayerAudio.play().catch(console.error);
+    }
+
+    // Dock Player Audio Element Event Listeners
+    activePlayerAudio.addEventListener('play', () => {
+      isPlaying = true;
+      document.getElementById('playerPlayIcon').setAttribute('data-lucide', 'pause');
+      lucide.createIcons();
+      updateRecordingsView();
+    });
+
+    activePlayerAudio.addEventListener('pause', () => {
+      isPlaying = false;
+      document.getElementById('playerPlayIcon').setAttribute('data-lucide', 'play');
+      lucide.createIcons();
+      updateRecordingsView();
+    });
+
+    activePlayerAudio.addEventListener('timeupdate', () => {
+      const cur = activePlayerAudio.currentTime;
+      const dur = activePlayerAudio.duration || currentPlayingClip?.duration || 1;
+      document.getElementById('playerCurrentTime').innerText = formatDuration(cur);
+
+      const slider = document.getElementById('playerProgressSlider');
+      slider.value = (cur / dur) * 100;
+    });
+
+    activePlayerAudio.addEventListener('ended', () => {
+      isPlaying = false;
+      document.getElementById('playerPlayIcon').setAttribute('data-lucide', 'play');
+      lucide.createIcons();
+      updateRecordingsView();
+    });
+
+    // Scrubber interaction
+    const progressSlider = document.getElementById('playerProgressSlider');
+    progressSlider.addEventListener('input', (e) => {
+      const pct = parseFloat(e.target.value);
+      const dur = activePlayerAudio.duration || currentPlayingClip?.duration || 0;
+      activePlayerAudio.currentTime = (pct / 100) * dur;
+    });
+
+    // Play/Pause button in dock
+    document.getElementById('playerPlayBtn').addEventListener('click', () => {
+      if (!currentPlayingClip) return;
+      if (isPlaying) {
+        activePlayerAudio.pause();
+      } else {
+        activePlayerAudio.play();
+      }
+    });
+
+    // Skip controls
+    document.getElementById('playerSkipBackBtn').addEventListener('click', () => {
+      activePlayerAudio.currentTime = Math.max(0, activePlayerAudio.currentTime - 5);
+    });
+    document.getElementById('playerSkipFwdBtn').addEventListener('click', () => {
+      activePlayerAudio.currentTime = Math.min(activePlayerAudio.duration, activePlayerAudio.currentTime + 5);
+    });
+
+    // Speed cycling
+    const speeds = [1.0, 1.25, 1.5, 2.0, 0.8];
+    document.getElementById('playerSpeedBtn').addEventListener('click', (e) => {
+      const nextIndex = (speeds.indexOf(playbackSpeed) + 1) % speeds.length;
+      playbackSpeed = speeds[nextIndex];
+      activePlayerAudio.playbackRate = playbackSpeed;
+      e.target.innerText = `${playbackSpeed}x`;
+      showToast(`Playback speed: ${playbackSpeed}x`, 'info');
+    });
+
+    // Volume & Mute
+    const volumeSlider = document.getElementById('playerVolumeSlider');
+    const volumeBtn = document.getElementById('playerMuteBtn');
+    volumeSlider.addEventListener('input', (e) => {
+      activePlayerAudio.volume = parseFloat(e.target.value);
+      activePlayerAudio.muted = false;
+      updateVolumeIcon(activePlayerAudio.volume);
+    });
+
+    volumeBtn.addEventListener('click', () => {
+      activePlayerAudio.muted = !activePlayerAudio.muted;
+      updateVolumeIcon(activePlayerAudio.muted ? 0 : activePlayerAudio.volume);
+    });
+
+    function updateVolumeIcon(vol) {
+      const icon = document.getElementById('playerVolumeIcon');
+      if (vol === 0) {
+        icon.setAttribute('data-lucide', 'volume-x');
+      } else if (vol < 0.5) {
+        icon.setAttribute('data-lucide', 'volume-1');
+      } else {
+        icon.setAttribute('data-lucide', 'volume-2');
+      }
+      lucide.createIcons();
+    }
+
+    // Close Player Dock
+    document.getElementById('playerCloseBtn').addEventListener('click', () => {
+      activePlayerAudio.pause();
+      document.getElementById('audioPlayerDock').classList.add('translate-y-full');
+    });
+
+    function downloadClip(record) {
+      const ext = record.mimeType.includes('ogg') ? 'ogg' : 'webm';
+      const cleanName = record.title.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const url = URL.createObjectURL(record.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${cleanName}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Audio file downloaded', 'success');
+    }
+
+    function copySSMLTag(record) {
+      // Actions on Google requires an HTTPS audio tag conforming to SSML standard:
+      // <audio src="https://.../recording.ogg">Alternate speech</audio>
+      const placeholderUrl = `https://storage.googleapis.com/actions-recordings-bucket/${record.id}.ogg`;
+      const ssmlTag = `<speak>\n  <audio src="${placeholderUrl}">[Voice message playing]</audio>\n</speak>`;
+      
+      const textArea = document.createElement('textarea');
+      textArea.value = ssmlTag;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        showToast('Actions on Google SSML snippet copied to clipboard!', 'success');
+      } catch (err) {
+        console.error('Copy failed:', err);
+      }
+      document.body.removeChild(textArea);
+    }
+
+    function renameClip(record) {
+      openPromptModal('Rename Recording', record.title, async (newTitle) => {
+        record.title = newTitle;
+        await dbRepo.saveRecording(record);
+        if (currentPlayingClip && currentPlayingClip.id === record.id) {
+          document.getElementById('playerTrackTitle').innerText = newTitle;
+        }
+        await updateRecordingsView();
+        showToast('Recording renamed', 'success');
+      });
+    }
+
+    function deleteClip(record) {
+      openConfirmDialog(
+        'Delete Recording?',
+        `Are you sure you want to delete "${record.title}" from browser local storage?`,
+        async () => {
+          if (currentPlayingClip && currentPlayingClip.id === record.id) {
+            activePlayerAudio.pause();
+            document.getElementById('audioPlayerDock').classList.add('translate-y-full');
+            currentPlayingClip = null;
+          }
+          await dbRepo.deleteRecording(record.id);
+          await updateRecordingsView();
+          await refreshStorageStatus();
+          showToast('Recording deleted', 'info');
+        }
+      );
+    }
+
+    async function refreshStorageStatus() {
+      const isPersisted = await StorageManagerHelper.checkPersistence();
+      const estimate = await StorageManagerHelper.getEstimate();
+
+      const usedMb = ((estimate.usage || 0) / (1024 * 1024)).toFixed(1);
+      const quotaMb = ((estimate.quota || 0) / (1024 * 1024 * 1024)).toFixed(1);
+
+      const summaryText = document.getElementById('storageSummaryText');
+      summaryText.innerText = `${usedMb} MB ${isPersisted ? '(Protected)' : '(Standard)'}`;
+
+      // Update storage modal elements
+      const persistBadge = document.getElementById('modalPersistStatusBadge');
+      if (isPersisted) {
+        persistBadge.innerText = 'Protected (Persistent)';
+        persistBadge.className = 'font-semibold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 text-[11px]';
+        document.getElementById('storagePermissionBanner').classList.add('hidden');
+      } else {
+        persistBadge.innerText = 'Best Effort (Ephemeral)';
+        persistBadge.className = 'font-semibold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800 text-[11px]';
+        document.getElementById('storagePermissionBanner').classList.remove('hidden');
+      }
+
+      document.getElementById('modalStorageUsed').innerText = `${usedMb} MB`;
+      document.getElementById('modalStorageQuota').innerText = `${quotaMb} GB`;
+
+      const pct = estimate.quota ? Math.min(100, ((estimate.usage || 0) / estimate.quota) * 100) : 0;
+      document.getElementById('modalStorageBar').style.width = `${Math.max(1, pct)}%`;
+    }
+
+    // Request persistence permission directly
+    async function handleRequestStorage() {
+      const granted = await StorageManagerHelper.requestPersistence();
+      if (granted) {
+        showToast('Persistent browser storage granted! Recordings protected.', 'success');
+      } else {
+        showToast('Storage permission granted in standard mode by browser.', 'info');
+      }
+      await refreshStorageStatus();
+    }
+
+    document.getElementById('grantStorageBtn').addEventListener('click', handleRequestStorage);
+    document.getElementById('requestPersistActionBtn').addEventListener('click', handleRequestStorage);
+
+    // Storage Modal open/close
+    document.getElementById('storageStatusBtn').addEventListener('click', async () => {
+      await refreshStorageStatus();
+      document.getElementById('storageModal').classList.remove('hidden');
+    });
+    document.getElementById('closeStorageModalBtn').addEventListener('click', () => {
+      document.getElementById('storageModal').classList.add('hidden');
+    });
+
+    // Clear All Recordings
+    document.getElementById('clearAllRecordingsBtn').addEventListener('click', () => {
+      openConfirmDialog(
+        'Delete All Recordings?',
+        'This will permanently delete all stored voice recordings from this browser.',
+        async () => {
+          activePlayerAudio.pause();
+          document.getElementById('audioPlayerDock').classList.add('translate-y-full');
+          currentPlayingClip = null;
+          await dbRepo.clearAll();
+          await updateRecordingsView();
+          await refreshStorageStatus();
+          showToast('All voice recordings cleared', 'warning');
+        }
+      );
+    });
+
+    // Search filter
+    document.getElementById('searchRecordingsInput').addEventListener('input', (e) => {
+      updateRecordingsView(e.target.value);
+    });
+    document.getElementById('refreshRecordingsBtn').addEventListener('click', () => {
+      updateRecordingsView();
+      refreshStorageStatus();
+      showToast('Recordings refreshed', 'info');
+    });
+
+    const tabRecord = document.getElementById('tabRecord');
+    const tabRecordings = document.getElementById('tabRecordings');
+    const viewStudio = document.getElementById('viewStudio');
+    const viewRecordings = document.getElementById('viewRecordings');
+    const goToStudioBtn = document.getElementById('goToStudioBtn');
+
+    function switchTab(target) {
+      if (target === 'studio') {
+        tabRecord.className = 'flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500/20 text-brand-400 border border-brand-500/30 transition';
+        tabRecordings.className = 'flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition';
+        viewStudio.classList.remove('hidden');
+        viewRecordings.classList.add('hidden');
+        resizeCanvas();
+        drawIdleVisualizer();
+      } else {
+        tabRecordings.className = 'flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500/20 text-brand-400 border border-brand-500/30 transition';
+        tabRecord.className = 'flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition';
+        viewStudio.classList.add('hidden');
+        viewRecordings.classList.remove('hidden');
+        updateRecordingsView();
+      }
+    }
+
+    tabRecord.addEventListener('click', () => switchTab('studio'));
+    tabRecordings.addEventListener('click', () => switchTab('recordings'));
+    goToStudioBtn.addEventListener('click', () => switchTab('studio'));
+
+    // Bootstrap app
+    window.addEventListener('DOMContentLoaded', async () => {
+      lucide.createIcons();
+      await dbRepo.init();
+      await updateRecordingsView();
+      await refreshStorageStatus();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "project": "web-recording",
+  "governance": {
+    "mv3_enforcement": "STRICT",
+    "pwa_manifest_disambiguation": "VERIFIED",
+    "remote_code_execution": "BLOCKED",
+    "inline_scripts": "PROHIBITED",
+    "csp_frame_ancestors": "DENY"
+  },
+  "deployment_gates": {
+    "firebase_hosting": {
+      "target": "dist/pwa",
+      "pwa_manifest_link": "/manifest.webmanifest",
+      "status": "APPROVED_FOR_STAGING"
+    },
+    "chrome_webstore": {
+      "target": "dist/extension",
+      "manifest_version": 3,
+      "status": "APPROVED_FOR_PACKAGING"
+    }
+  }
+}

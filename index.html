@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Voice Actions Studio - Audio Recorder</title>
+  
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="48x48" href="./icons/icon-48.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./icons/icon-16.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <meta name="theme-color" content="#020617">
+  <meta name="description" content="Single-page audio recording studio for capturing, playing, and managing voice notes and Actions on Google SSML clips.">
+</head>
+
+<body class="h-full flex flex-col antialiased selection:bg-brand-500 selection:text-white pb-28 md:pb-24">
+  
+  <!-- App Header -->
+  <header class="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 sm:px-6">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 text-white shadow-lg shadow-brand-500/20">
+          <i data-lucide="mic" class="w-5 h-5"></i>
+          <span id="recordingBadge" class="hidden absolute -top-1 -right-1 flex h-3 w-3">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+          </span>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">VoiceStudio</h1>
+            <span id="runtimeEnvBadge" class="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20">
+              Actions &amp; SSML
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Persistent In-Browser Audio Capture &amp; Assistant Playback</p>
+        </div>
+      </div>
+
+      <!-- Action items & Storage status -->
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <button id="storageStatusBtn" type="button" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700/80 text-slate-300 border border-slate-700/50 transition">
+          <i data-lucide="database" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span id="storageSummaryText">Storage Check</span>
+        </button>
+
+        <button id="pwaInstallBtn" type="button" class="hidden items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white shadow-md shadow-brand-600/30 transition">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Install PWA</span>
+          <span class="sm:hidden">Install</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+    
+    <!-- Top Navigation Tabs -->
+    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+      <nav class="flex space-x-2" aria-label="Tabs">
+        <button id="tabRecord" type="button" class="flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold bg-brand-500/20 text-brand-400 border border-brand-500/30 transition">
+          <i data-lucide="disc" class="w-4 h-4"></i>
+          <span>Studio Recorder</span>
+        </button>
+        <button id="tabRecordings" type="button" class="flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+          <i data-lucide="list-music" class="w-4 h-4"></i>
+          <span>Recordings</span>
+          <span id="recordingsCountBadge" class="ml-1 text-[11px] px-2 py-0.2 rounded-full bg-slate-800 text-slate-300 border border-slate-700">0</span>
+        </button>
+      </nav>
+
+      <!-- Assistant Limit Indicator -->
+      <div class="hidden sm:flex items-center space-x-2 text-xs text-slate-400">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span>Actions on Google compliant (OGG/WebM Opus, &le;240s)</span>
+      </div>
+    </div>
+
+    <!-- Recorder Studio Section -->
+    <section id="viewStudio" class="space-y-6 transition-all duration-300">
+      
+      <!-- Top banner for Storage Persistence Permission -->
+      <div id="storagePermissionBanner" class="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner">
+        <div class="flex items-start sm:items-center space-x-3">
+          <div class="p-2 rounded-xl bg-indigo-600/20 text-indigo-400 shrink-0">
+            <i data-lucide="shield-check" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h2 class="text-sm font-semibold text-indigo-200">Local Browser Storage Permission</h2>
+            <p class="text-xs text-indigo-300/70">Enable persistent quota to keep voice clips protected against automatic browser cache eviction.</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2 shrink-0">
+          <button id="grantStorageBtn" type="button" class="w-full sm:w-auto px-4 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow transition">
+            Grant Persistent Storage
+          </button>
+        </div>
+      </div>
+
+      <!-- Recorder Card -->
+      <div class="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800/90 shadow-2xl p-6 sm:p-8">
+        
+        <!-- Live Visualizer Canvas Container -->
+        <div class="relative w-full h-40 sm:h-48 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col items-center justify-center overflow-hidden">
+          <canvas id="waveformCanvas" class="w-full h-full block"></canvas>
+          
+          <!-- Idle hint overlay -->
+          <div id="visualizerIdleHint" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-slate-500 space-y-2">
+            <i data-lucide="audio-waveform" class="w-8 h-8 opacity-40"></i>
+            <span class="text-xs font-medium tracking-wide">Press Record to activate audio meter</span>
+          </div>
+
+          <!-- Live decibel & audio frequency badge -->
+          <div id="liveStatsBadge" class="hidden absolute top-3 left-3 flex items-center space-x-2 px-2.5 py-1 rounded-md bg-slate-900/90 border border-slate-700/60 text-[11px] font-mono text-slate-300">
+            <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+            <span id="liveDbText">-inf dB</span>
+            <span class="text-slate-600">|</span>
+            <span id="liveFreqText">48kHz Opus</span>
+          </div>
+
+          <!-- SSML 240s Countdown indicator -->
+          <div id="ssmlTimerBadge" class="hidden absolute top-3 right-3 flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-slate-900/90 border border-slate-700/60 text-[11px] font-mono text-amber-300">
+            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+            <span id="ssmlRemainingText">240s limit</span>
+          </div>
+        </div>
+
+        <!-- Timer & Recording Status Indicator -->
+        <div class="mt-8 flex flex-col items-center justify-center space-y-4 text-center">
+          <div class="space-y-1">
+            <div id="timerDisplay" class="text-4xl sm:text-5xl font-mono font-bold tracking-tight text-white">00:00.0</div>
+            <div id="recordingStatusText" class="text-xs font-medium uppercase tracking-widest text-slate-400">
+              Ready to Capture
+            </div>
+          </div>
+
+          <!-- Primary Control Action Buttons -->
+          <div class="flex items-center justify-center space-x-4 pt-2">
+            
+            <!-- Pause / Resume Button -->
+            <button id="pauseRecordBtn" type="button" disabled class="p-3.5 rounded-2xl bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-700 border border-slate-700 transition" title="Pause/Resume">
+              <i data-lucide="pause" id="pauseBtnIcon" class="w-5 h-5"></i>
+            </button>
+
+            <!-- Main Record / Stop Circle -->
+            <div class="relative flex items-center justify-center">
+              <div id="recordRingGlow" class="hidden absolute -inset-2 rounded-full bg-red-600/30 blur-lg animate-ripple"></div>
+              <button id="toggleRecordBtn" type="button" class="relative z-10 w-20 h-20 rounded-full bg-gradient-to-tr from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 text-white flex items-center justify-center shadow-xl shadow-red-600/40 hover:scale-105 active:scale-95 transition-all">
+                <i data-lucide="mic" id="recordBtnIcon" class="w-8 h-8"></i>
+              </button>
+            </div>
+
+            <!-- Cancel / Discard Button -->
+            <button id="discardRecordBtn" type="button" disabled class="p-3.5 rounded-2xl bg-slate-800 text-slate-400 hover:text-red-400 disabled:opacity-30 disabled:pointer-events-none hover:bg-slate-700 border border-slate-700 transition" title="Discard">
+              <i data-lucide="trash-2" class="w-5 h-5"></i>
+            </button>
+          </div>
+
+          <!-- Configuration and Mode Settings -->
+          <div class="w-full max-w-md pt-6 border-t border-slate-800/80 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-400">
+            <label class="flex items-center space-x-2 cursor-pointer select-none">
+              <input type="checkbox" id="ssmlLimitToggle" checked class="w-4 h-4 rounded text-brand-500 bg-slate-800 border-slate-700 focus:ring-0">
+              <span>Actions on Google 240s Auto-stop</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer select-none">
+              <input type="checkbox" id="noiseSuppressionToggle" checked class="w-4 h-4 rounded text-brand-500 bg-slate-800 border-slate-700 focus:ring-0">
+              <span>Speech Noise Suppression</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Tips & Protocol Info -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/60 space-y-1.5">
+          <div class="flex items-center space-x-2 text-indigo-400 text-xs font-semibold uppercase tracking-wider">
+            <i data-lucide="cpu" class="w-4 h-4"></i>
+            <span>Pure Client-Side</span>
+          </div>
+          <p class="text-xs text-slate-400">Uses HTML5 MediaStream &amp; Web Audio API. Zero external tracking or plugins.</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/60 space-y-1.5">
+          <div class="flex items-center space-x-2 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
+            <i data-lucide="hard-drive-download" class="w-4 h-4"></i>
+            <span>Local IndexedDB</span>
+          </div>
+          <p class="text-xs text-slate-400">Audio blobs are saved directly into your browser's persistent storage sandbox.</p>
+        </div>
+        <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/60 space-y-1.5">
+          <div class="flex items-center space-x-2 text-amber-400 text-xs font-semibold uppercase tracking-wider">
+            <i data-lucide="code-xml" class="w-4 h-4"></i>
+            <span>SSML Ready</span>
+          </div>
+          <p class="text-xs text-slate-400">Instantly generate ready-to-use <code>&lt;audio src="..."&gt;</code> SSML tags for voice assistant actions.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recordings List Section -->
+    <section id="viewRecordings" class="hidden space-y-6">
+      <!-- Search & Filters Toolbar -->
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div class="relative flex-1">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+          <input type="text" id="searchRecordingsInput" placeholder="Filter voice clips..." class="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500 transition">
+        </div>
+        <div class="flex items-center space-x-2">
+          <button id="refreshRecordingsBtn" type="button" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition" title="Refresh List">
+            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+          </button>
+          <button id="clearAllRecordingsBtn" type="button" class="px-3 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-800/40 text-xs font-medium text-red-300 transition flex items-center space-x-1.5">
+            <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+            <span>Delete All</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Recordings Container List -->
+      <div id="recordingsList" class="space-y-3">
+        <!-- Dynamic recording cards injected here -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyRecordingsState" class="hidden flex flex-col items-center justify-center p-12 text-center rounded-2xl bg-slate-900/40 border border-dashed border-slate-800 space-y-3">
+        <div class="p-4 rounded-full bg-slate-800/60 text-slate-500">
+          <i data-lucide="mic-off" class="w-8 h-8"></i>
+        </div>
+        <div class="space-y-1">
+          <h3 class="text-sm font-semibold text-slate-300">No voice recordings stored yet</h3>
+          <p class="text-xs text-slate-500 max-w-sm">Switch to the Studio Recorder tab and capture your first audio clip.</p>
+        </div>
+        <button id="goToStudioBtn" type="button" class="mt-2 px-4 py-2 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white transition">
+          Launch Recorder
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Sticky Bottom Audio Player Dock -->
+  <aside id="audioPlayerDock" class="fixed bottom-0 inset-x-0 z-50 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 px-4 py-3 sm:px-6 shadow-2xl transition-transform duration-300 translate-y-full">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-6">
+      
+      <!-- Track Details & SSML indicator -->
+      <div class="flex items-center space-x-3 w-full sm:w-1/4 min-w-0">
+        <div class="w-10 h-10 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center shrink-0 border border-brand-500/30">
+          <i data-lucide="music" class="w-5 h-5"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+          <h4 id="playerTrackTitle" class="text-xs sm:text-sm font-semibold text-white truncate">Select a clip</h4>
+          <p id="playerTrackMeta" class="text-[11px] text-slate-400 truncate">00:00 &bull; Audio</p>
+        </div>
+      </div>
+
+      <!-- Scrubber & Playback Controls -->
+      <div class="flex flex-col items-center w-full sm:w-2/4 space-y-1.5">
+        <div class="flex items-center space-x-4">
+          <button id="playerSkipBackBtn" type="button" class="text-slate-400 hover:text-white transition" title="Rewind 5s">
+            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+          </button>
+          <button id="playerPlayBtn" type="button" class="w-9 h-9 rounded-full bg-brand-600 hover:bg-brand-500 text-white flex items-center justify-center shadow-md shadow-brand-600/30 transition">
+            <i data-lucide="play" id="playerPlayIcon" class="w-4 h-4 ml-0.5"></i>
+          </button>
+          <button id="playerSkipFwdBtn" type="button" class="text-slate-400 hover:text-white transition" title="Forward 5s">
+            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- Progress Timeline slider -->
+        <div class="flex items-center space-x-2.5 w-full">
+          <span id="playerCurrentTime" class="text-[10px] font-mono text-slate-400 w-8 text-right">0:00</span>
+          <input type="range" id="playerProgressSlider" min="0" max="100" value="0" step="0.1" class="w-full flex-1">
+          <span id="playerDuration" class="text-[10px] font-mono text-slate-400 w-8">0:00</span>
+        </div>
+      </div>
+
+      <!-- Volume, Speed, and Close Dock -->
+      <div class="flex items-center justify-end space-x-3 w-full sm:w-1/4">
+        <!-- Speed chip -->
+        <button id="playerSpeedBtn" type="button" class="px-2 py-1 rounded text-[11px] font-mono font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+          1.0x
+        </button>
+
+        <!-- Volume Mute toggle & Slider -->
+        <div class="hidden sm:flex items-center space-x-1.5">
+          <button id="playerMuteBtn" type="button" class="text-slate-400 hover:text-white">
+            <i data-lucide="volume-2" id="playerVolumeIcon" class="w-4 h-4"></i>
+          </button>
+          <input type="range" id="playerVolumeSlider" min="0" max="1" step="0.05" value="1" class="w-16">
+        </div>
+
+        <!-- Close Dock button -->
+        <button id="playerCloseBtn" type="button" class="text-slate-500 hover:text-slate-300 p-1" title="Close player">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Storage Inspection Modal -->
+  <div id="storageModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+    <div class="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2 text-indigo-400">
+          <i data-lucide="hard-drive" class="w-5 h-5"></i>
+          <h3 class="text-base font-semibold text-white">Browser Storage Status</h3>
+        </div>
+        <button id="closeStorageModalBtn" type="button" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400">Persistence Status:</span>
+            <span id="modalPersistStatusBadge" class="font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">Checking...</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400">Storage Used:</span>
+            <span id="modalStorageUsed" class="font-mono text-slate-200">0 MB</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400">Storage Quota:</span>
+            <span id="modalStorageQuota" class="font-mono text-slate-200">Unknown</span>
+          </div>
+          <!-- Progress bar -->
+          <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            <div id="modalStorageBar" class="bg-indigo-500 h-full w-0 transition-all duration-300"></div>
+          </div>
+        </div>
+
+        <p class="text-slate-400 leading-relaxed">
+          Google Chrome and Chromium browsers provide persistent client storage via the StorageManager API. When enabled, your voice recordings will not be purged during low disk space cleans.
+        </p>
+      </div>
+
+      <div class="flex items-center justify-end space-x-2 pt-2">
+        <button id="requestPersistActionBtn" type="button" class="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition">
+          Request Full Persistence
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Confirmation Dialog (Replaces native confirm()) -->
+  <div id="confirmDialog" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div class="w-full max-w-sm rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4">
+      <div class="flex items-center space-x-3 text-amber-400">
+        <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+        <h4 id="confirmDialogTitle" class="text-sm font-bold text-white">Confirmation</h4>
+      </div>
+      <p id="confirmDialogMessage" class="text-xs text-slate-300 leading-relaxed"></p>
+      <div class="flex items-center justify-end space-x-2 pt-2">
+        <button id="confirmCancelBtn" type="button" class="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          Cancel
+        </button>
+        <button id="confirmProceedBtn" type="button" class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-500 text-white shadow transition">
+          Proceed
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Prompt Modal for Renaming Clip -->
+  <div id="promptModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div class="w-full max-w-sm rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4">
+      <h4 id="promptModalTitle" class="text-sm font-bold text-white">Rename Recording</h4>
+      <input type="text" id="promptModalInput" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-200 focus:outline-none focus:border-brand-500">
+      <div class="flex items-center justify-end space-x-2 pt-2">
+        <button id="promptCancelBtn" type="button" class="px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          Cancel
+        </button>
+        <button id="promptSubmitBtn" type="button" class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white transition">
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Toast Notification System -->
+  <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <!-- Main SPA Bundle Entry (Zero inline scripts) -->
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
