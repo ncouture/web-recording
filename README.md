@@ -144,6 +144,28 @@ Security is maintained through strict structural boundaries detailed in [`SECURI
 - **Client-Side Storage**: Voice data never leaves the client's device; recordings reside in origin-isolated `IndexedDB`.
 - **Least-Privilege CI Tokens**: The release pipeline requests only `contents: write` and `pull-requests: write`.
 - **Runtime Anomaly Monitoring**: `TelemetryCircuitBreaker` detects CSP violations and shuts down privileged operations if suspicious tampering occurs.
+- **Supply Chain Hardening (Ratchet SHA Pinning)**: All third-party GitHub Actions across workflows are pinned to immutable release commit SHAs using [`sethvargo/ratchet`](https://github.com/sethvargo/ratchet), preventing tag mutation and supply chain compromise.
+
+### CI/CD Workflow Security & Pre-commit Hooks
+
+Git pre-commit hooks are configured to install and run [`sethvargo/ratchet`](https://github.com/sethvargo/ratchet), ensuring all GitHub Action modules across `.github/workflows/` are pinned to their release's git commit SHA sum:
+
+- **Automatic Hook Installation**: Running `npm install` triggers `npm run prepare`, installing the pre-commit hook into `.git/hooks/pre-commit` and configuring `pre-commit` if installed.
+- **Dual Compatibility**: Operates seamlessly via native Git hooks (`.git/hooks/pre-commit`) or the Python [`pre-commit`](https://pre-commit.com) framework (`.pre-commit-config.yaml`).
+- **Auto-Installation**: If `ratchet` is not installed on the system, the scripts automatically download and configure the standalone binary into `.bin/ratchet`.
+- **CI Verification Gate**: The Security CI pipeline (`security-ci.yml`) validates that every workflow is pinned before merging.
+
+Available Ratchet npm scripts:
+```bash
+# Verify that all GitHub Actions references are pinned to commit SHAs
+npm run ratchet:lint
+
+# Automatically resolve and pin unpinned GitHub Actions references
+npm run ratchet:pin
+
+# Ensure the ratchet binary is installed locally
+npm run ratchet:install
+```
 
 For responsible disclosure guidelines, refer to [SECURITY.md](file:///home/self/git/web-recording/SECURITY.md).
 

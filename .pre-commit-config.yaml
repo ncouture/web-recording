@@ -1,0 +1,20 @@
+# .pre-commit-config.yaml
+# Integration with sethvargo/ratchet for GitHub Actions version pinning
+repos:
+  - repo: local
+    hooks:
+      - id: ratchet-pin
+        name: Ratchet Pin GitHub Actions
+        description: Automatically pin GitHub Action modules in workflow files to their release commit SHAs
+        entry: scripts/run-ratchet.sh pin
+        language: script
+        files: ^\.github/workflows/.*\.(yml|yaml)$
+        pass_filenames: true
+
+      - id: ratchet-lint
+        name: Ratchet Lint GitHub Actions
+        description: Ensure all GitHub Action modules in workflow files are pinned to commit SHAs
+        entry: scripts/run-ratchet.sh lint
+        language: script
+        files: ^\.github/workflows/.*\.(yml|yaml)$
+        pass_filenames: true

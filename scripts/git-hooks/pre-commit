@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# scripts/git-hooks/pre-commit
+# Git pre-commit hook that installs and runs sethvargo/ratchet to ensure all GitHub Action modules are pinned to commit SHAs.
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "${REPO_ROOT}"
+
+# If invoked inside Python pre-commit framework, avoid recursion
+if [ "${PRE_COMMIT:-0}" = "1" ]; then
+  exec "${REPO_ROOT}/scripts/run-ratchet.sh" hook
+fi
+
+# If Python pre-commit framework is installed and configured, use it
+if command -v pre-commit >/dev/null 2>&1 && [ -f "${REPO_ROOT}/.pre-commit-config.yaml" ]; then
+  exec pre-commit run --hook-stage pre-commit
+fi
+
+# Otherwise, execute native ratchet hook directly
+exec "${REPO_ROOT}/scripts/run-ratchet.sh" hook

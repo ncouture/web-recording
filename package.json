@@ -10,7 +10,11 @@
     "build:all": "npm run build:pwa && npm run build:extension",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "deploy:firebase": "npm run build:pwa && firebase deploy --only hosting"
+    "deploy:firebase": "npm run build:pwa && firebase deploy --only hosting",
+    "ratchet:install": "scripts/ensure-ratchet.sh",
+    "ratchet:lint": "scripts/run-ratchet.sh lint",
+    "ratchet:pin": "scripts/run-ratchet.sh pin",
+    "prepare": "sh scripts/install-hooks.sh"
   },
   "dependencies": {
     "lucide": "^1.48.0"
