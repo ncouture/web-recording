@@ -1,12 +1,12 @@
 # VoiceStudio — Dual-Target Progressive Web App & Chrome Extension (MV3)
 
-A high-performance, privacy-first audio and voice recording studio engineered with a unified codebase. It builds both as a standalone **Progressive Web Application (PWA)** deployable to **Firebase Hosting** and as an unpacked **Manifest V3 Chrome Extension** installable in Google Chrome.
+VoiceStudio is an audio and voice recording studio built with TypeScript and Tailwind CSS. It compiles into two independent targets from a single codebase: a standalone **Progressive Web Application (PWA)** deployed to **Firebase Hosting** and an unpacked **Manifest V3 Chrome Extension** for Google Chrome.
 
-[![CI Verification](https://github.com/self/web-recording/actions/workflows/security-ci.yml/badge.svg)](https://github.com/self/web-recording/actions/workflows/security-ci.yml)
-[![Release Automation](https://github.com/self/web-recording/actions/workflows/release.yml/badge.svg)](https://github.com/self/web-recording/actions/workflows/release.yml)
+[![CI Verification](https://github.com/ncouture/web-recording/actions/workflows/security-ci.yml/badge.svg)](https://github.com/ncouture/web-recording/actions/workflows/security-ci.yml)
+[![Release Automation](https://github.com/ncouture/web-recording/actions/workflows/release.yml/badge.svg)](https://github.com/ncouture/web-recording/actions/workflows/release.yml)
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
-[![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](file:///home/self/git/web-recording/SECURITY.md)
-[![Changelog](https://img.shields.io/badge/Changelog-Keep%20a%20Changelog-orange.svg)](file:///home/self/git/web-recording/CHANGELOG.md)
+[![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
+[![Changelog](https://img.shields.io/badge/Changelog-Keep%20a%20Changelog-orange.svg)](CHANGELOG.md)
 
 ---
 
@@ -31,27 +31,27 @@ A high-performance, privacy-first audio and voice recording studio engineered wi
     └─────────────────────────┘             └─────────────────────────┘
 ```
 
-### Core Architecture Highlights
+### Architecture Details
 
-1. **Manifest Disambiguation**:
-   - The PWA manifest is served as `manifest.webmanifest` (`dist/pwa/manifest.webmanifest`).
-   - The Chrome Extension manifest is `manifest.json` (`dist/extension/manifest.json`).
-   - This eliminates namespace collisions and build corruption during development or side-loading.
+1. **Manifest Separation**:
+   * PWA manifest: `dist/pwa/manifest.webmanifest`.
+   * Chrome Extension manifest: `dist/extension/manifest.json`.
+   * This separation avoids namespace collisions when developing or side-loading.
 
-2. **Universal Zero-Inline-Script Policy (MV3 & Firebase CSP Parity)**:
-   - Chrome Manifest V3 strictly prohibits inline scripts (`<script>...</script>`), inline event listeners (`onclick`), and dynamic eval (`new Function()`, `eval()`).
-   - The UI runs through clean event listeners in TypeScript, with all styling and icons bundled locally.
+2. **Zero-Inline-Script Policy**:
+   * In compliance with Chrome Manifest V3 and Firebase CSP, the codebase prohibits inline scripts (`<script>...</script>`), inline handlers (`onclick`), and dynamic code evaluation (`eval()`, `new Function()`).
+   * UI components use TypeScript event listeners, and styles and icons are bundled locally.
 
 3. **Platform Abstraction Layer (PAL)**:
-   - [`PlatformAdapter`](file:///home/self/git/web-recording/src/core/platform.ts) safely detects execution context (`chrome-extension` vs `pwa-browser`).
-   - [`StorageService`](file:///home/self/git/web-recording/src/core/storage.ts) provides persistent storage across both targets:
-     - High-capacity audio blobs reside in `IndexedDB` (`VoiceStudioAudioDB`), supported across both browser windows and extension popups.
-     - User preferences (noise cancellation, SSML toggle, playback rate) sync via `chrome.storage.local` in the extension and `localStorage` in the PWA.
+   * [`src/core/platform.ts`](src/core/platform.ts) detects the execution environment (`chrome-extension` vs `pwa-browser`).
+   * [`src/core/storage.ts`](src/core/storage.ts) provides persistent storage across both environments:
+     * Audio blobs are stored in `IndexedDB` (`VoiceStudioAudioDB`) in both browser tabs and extension popups.
+     * User settings (noise suppression, SSML toggle, playback speed) sync via `chrome.storage.local` in the extension and `localStorage` in the PWA.
 
-4. **Actions on Google & Assistant SSML Compliance**:
-   - Validates audio streams to 48kHz mono Opus (WebM/OGG).
-   - Auto-stop limit enforcer at 240 seconds (Actions on Google audio ceiling).
-   - 1-click SSML `<audio src="...">` tag generation.
+4. **Actions on Google and Assistant SSML Format**:
+   * Captures audio at 48kHz mono Opus (WebM/OGG).
+   * Enforces a 240-second recording duration ceiling.
+   * Generates formatted SSML `<audio src="...">` markup.
 
 ---
 
@@ -61,19 +61,25 @@ A high-performance, privacy-first audio and voice recording studio engineered wi
 web-recording/
 ├── .github/
 │   └── workflows/
-│       ├── release.yml            # Automated releases via release-please-action
+│       ├── release.yml            # Release automation via release-please-action
 │       └── security-ci.yml        # CI build and distribution integrity gates
 ├── extension/
 │   ├── manifest.json              # Chrome Extension MV3 manifest
 │   └── background.ts              # Extension background service worker
 ├── public/
-│   ├── icons/                     # Fixed-dimension icons (16, 48, 128, 192, 512)
+│   ├── icons/                     # Icons (16, 48, 128, 192, 512)
 │   │   ├── icon-16.png
 │   │   ├── icon-48.png
 │   │   ├── icon-128.png
 │   │   ├── icon-192.png
 │   │   └── icon-512.png
 │   └── manifest.webmanifest       # PWA web app manifest
+├── scripts/
+│   ├── git-hooks/
+│   │   └── pre-commit             # Standalone git pre-commit hook
+│   ├── ensure-ratchet.sh          # Auto-installer for sethvargo/ratchet binary
+│   ├── install-hooks.sh           # Hook installation script (run on npm prepare)
+│   └── run-ratchet.sh             # Ratchet execution wrapper (pin, lint, hook)
 ├── security/
 │   └── security-gate.json         # Security definitions & governance
 ├── src/
@@ -87,14 +93,15 @@ web-recording/
 │   ├── ui/
 │   │   ├── app-controller.ts      # Application controller & state orchestration
 │   │   ├── toast.ts               # Accessible modals & toast notifications
-│   │   └── visualizer.ts          # HiDPI canvas waveform visualizer
+│   │   └── visualizer.ts          # Canvas waveform visualizer
 │   ├── styles/
-│   │   └── main.css               # Tailwind CSS theme & animations
+│   │   └── main.css               # Tailwind CSS theme & styles
 │   ├── sw-pwa.ts                  # PWA offline cache service worker
-│   └── main.ts                    # Single-page application entry point
+│   └── main.ts                    # Application entry point
+├── .pre-commit-config.yaml        # Python pre-commit framework configuration
 ├── CHANGELOG.md                   # Chronological changelog driven by Conventional Commits
 ├── CHROMEWEBSTORE.md              # Chrome Web Store metadata & justifications
-├── SECURITY.md                    # Comprehensive security policy & disclosure process
+├── SECURITY.md                    # Security policy & disclosure process
 ├── firebase.json                  # Firebase Hosting rewrites & security headers
 ├── index.html                     # SPA container (zero inline scripts)
 ├── package.json                   # Build scripts & local dependencies
@@ -108,66 +115,66 @@ web-recording/
 
 ## Release Automation & Conventional Commits
 
-Releases are fully automated via [`release.yml`](file:///home/self/git/web-recording/.github/workflows/release.yml) using Google's [`googleapis/release-please-action`](https://github.com/googleapis/release-please-action).
+Releases are automated through [`.github/workflows/release.yml`](.github/workflows/release.yml) using [`googleapis/release-please-action`](https://github.com/googleapis/release-please-action).
 
 ### Conventional Commits Guide
 
-Every commit message determines the next semantic release version and updates [`CHANGELOG.md`](file:///home/self/git/web-recording/CHANGELOG.md):
+Commit messages determine version bumps and update [CHANGELOG.md](CHANGELOG.md):
 
 | Commit Type | Release Semantics | Example |
 | :--- | :---: | :--- |
 | `feat:` | **Minor** (Feature addition) | `feat: add stereo recording mode toggle` |
-| `fix:` | **Patch** (Bug remediation) | `fix: resolve playback scrubber drag stutter` |
-| `perf:` | **Patch** (Performance optimization) | `perf: reduce audio peak extraction memory buffer` |
+| `fix:` | **Patch** (Bug fix) | `fix: resolve playback scrubber drag stutter` |
+| `perf:` | **Patch** (Performance optimization) | `perf: reduce audio peak extraction buffer` |
 | `BREAKING CHANGE:` or `type!:` | **Major** (Breaking changes) | `feat!: overhaul storage schema to multi-track` |
-| `docs:` | *None / Patch* (Documentation only) | `docs: add Chrome Web Store review screenshots` |
+| `docs:` | *None / Patch* (Documentation) | `docs: add Chrome Web Store review screenshots` |
 | `refactor:` | *None / Patch* (Refactoring) | `refactor: extract audio node setup into pipeline` |
 | `style:`, `test:`, `chore:`, `ci:` | *Internal updates* | `ci: pin release action to commit SHA` |
 
-### How the Release Lifecycle Operates
+### Release Lifecycle
 
-1. **Feature PRs**: Contributors open pull requests with Conventional Commit titles (e.g., `feat: export MP3 audio format`).
-2. **Release PR Creation**: When merged into `main`, `release-please-action` creates or updates an open release PR (e.g., `chore(main): release 1.1.0`), bumping [`package.json`](file:///home/self/git/web-recording/package.json) and drafting notes in [`CHANGELOG.md`](file:///home/self/git/web-recording/CHANGELOG.md).
-3. **Automated Publishing & Assets**: Merging the release PR triggers the post-release step:
-   - Builds both production targets (`dist/pwa` and `dist/extension`).
-   - Packages standalone ZIP distributions: `voicestudio-pwa-vX.Y.Z.zip` and `voicestudio-extension-vX.Y.Z.zip`.
-   - Calculates cryptographic SHA256 checksums into `checksums.sha256`.
-   - Attaches all distribution assets to the new GitHub Release automatically.
+1. **Pull Requests**: Pull requests use Conventional Commit titles (e.g., `feat: export MP3 audio format`).
+2. **Release PR Creation**: When changes merge into `main`, Release Please creates or updates an open release pull request, bumping version numbers in [`package.json`](package.json) and drafting notes in [CHANGELOG.md](CHANGELOG.md).
+3. **Packaging and Publishing**: Merging the release pull request triggers distribution builds:
+   * Compiles production targets (`dist/pwa` and `dist/extension`).
+   * Packages release ZIP archives: `voicestudio-pwa-vX.Y.Z.zip` and `voicestudio-extension-vX.Y.Z.zip`.
+   * Generates SHA256 checksums into `checksums.sha256`.
+   * Attaches the archives and checksums to the GitHub Release.
 
 ---
 
-## Security Model & Policy
+## Security Model
 
-Security is maintained through strict structural boundaries detailed in [`SECURITY.md`](file:///home/self/git/web-recording/SECURITY.md):
+Security controls are documented in detail in [SECURITY.md](SECURITY.md):
 
-- **Zero Inline Code**: In accordance with Chrome Extension Manifest V3 and Firebase CSP, all scripts and styles are bundled locally.
-- **Client-Side Storage**: Voice data never leaves the client's device; recordings reside in origin-isolated `IndexedDB`.
-- **Least-Privilege CI Tokens**: The release pipeline requests only `contents: write` and `pull-requests: write`.
-- **Runtime Anomaly Monitoring**: `TelemetryCircuitBreaker` detects CSP violations and shuts down privileged operations if suspicious tampering occurs.
-- **Supply Chain Hardening (Ratchet SHA Pinning)**: All third-party GitHub Actions across workflows are pinned to immutable release commit SHAs using [`sethvargo/ratchet`](https://github.com/sethvargo/ratchet), preventing tag mutation and supply chain compromise.
+* **Zero Inline Code**: All scripts and styles are bundled into static modules.
+* **Client-Side Storage**: Audio data remains in the browser's origin-isolated `IndexedDB`.
+* **Least-Privilege CI Tokens**: Workflows use read-only token defaults, granting explicit write permissions (`contents: write`, `pull-requests: write`) only where needed.
+* **Anomaly Circuit Breaker**: [`src/core/telemetry.ts`](src/core/telemetry.ts) detects CSP violations and shuts down audio operations if tampering occurs.
+* **Supply Chain Hardening (Ratchet SHA Pinning)**: All third-party GitHub Actions across workflows are pinned to full commit SHAs using [`sethvargo/ratchet`](https://github.com/sethvargo/ratchet), preventing mutable tag poisoning.
 
 ### CI/CD Workflow Security & Pre-commit Hooks
 
-Git pre-commit hooks are configured to install and run [`sethvargo/ratchet`](https://github.com/sethvargo/ratchet), ensuring all GitHub Action modules across `.github/workflows/` are pinned to their release's git commit SHA sum:
+Pre-commit hooks verify that GitHub Actions across `.github/workflows/` are pinned to commit SHAs:
 
-- **Automatic Hook Installation**: Running `npm install` triggers `npm run prepare`, installing the pre-commit hook into `.git/hooks/pre-commit` and configuring `pre-commit` if installed.
-- **Dual Compatibility**: Operates seamlessly via native Git hooks (`.git/hooks/pre-commit`) or the Python [`pre-commit`](https://pre-commit.com) framework (`.pre-commit-config.yaml`).
-- **Auto-Installation**: If `ratchet` is not installed on the system, the scripts automatically download and configure the standalone binary into `.bin/ratchet`.
-- **CI Verification Gate**: The Security CI pipeline (`security-ci.yml`) validates that every workflow is pinned before merging.
+* **Automatic Hook Setup**: Running `npm install` triggers `npm run prepare`, installing the hook into `.git/hooks/pre-commit`.
+* **Dual Integration**: Works with native Git hooks (`.git/hooks/pre-commit`) and the Python [`pre-commit`](https://pre-commit.com) framework (`.pre-commit-config.yaml`).
+* **Automatic Binary Installation**: If `ratchet` is not installed on the system, [`scripts/ensure-ratchet.sh`](scripts/ensure-ratchet.sh) downloads the platform binary to `.bin/ratchet`.
+* **CI Verification**: The Security CI pipeline (`security-ci.yml`) runs `npm run ratchet:lint` on pull requests and pushes to `main`.
 
-Available Ratchet npm scripts:
+Ratchet npm commands:
 ```bash
-# Verify that all GitHub Actions references are pinned to commit SHAs
+# Check that all GitHub Action references are pinned to commit SHAs
 npm run ratchet:lint
 
-# Automatically resolve and pin unpinned GitHub Actions references
+# Automatically resolve and pin unpinned GitHub Action references
 npm run ratchet:pin
 
-# Ensure the ratchet binary is installed locally
+# Download and install the ratchet binary locally
 npm run ratchet:install
 ```
 
-For responsible disclosure guidelines, refer to [SECURITY.md](file:///home/self/git/web-recording/SECURITY.md).
+Refer to [SECURITY.md](SECURITY.md) for vulnerability disclosure procedures.
 
 ---
 
@@ -177,8 +184,9 @@ For responsible disclosure guidelines, refer to [SECURITY.md](file:///home/self/
 ```bash
 npm install
 ```
+This also runs `prepare` to configure git hooks and ratchet.
 
-### 2. Local Development Server
+### 2. Development Server
 ```bash
 npm run dev
 ```
@@ -196,17 +204,17 @@ npm run typecheck
 ```bash
 npm run build:pwa
 ```
-- Bundles static assets with relative URLs.
-- Compiles `src/sw-pwa.ts` to `dist/pwa/sw-pwa.js`.
-- Bundles `dist/pwa/manifest.webmanifest` and web icons.
+* Bundles static assets with relative paths.
+* Compiles `src/sw-pwa.ts` to `dist/pwa/sw-pwa.js`.
+* Emits `dist/pwa/manifest.webmanifest` and web icons.
 
 ### Build Chrome Extension Target (`dist/extension`)
 ```bash
 npm run build:extension
 ```
-- Compiles `extension/background.ts` to `dist/extension/background.js`.
-- Copies `extension/manifest.json` to `dist/extension/manifest.json`.
-- Strips PWA manifest tags from `dist/extension/index.html` to maintain pure MV3 compliance.
+* Compiles `extension/background.ts` to `dist/extension/background.js`.
+* Copies `extension/manifest.json` to `dist/extension/manifest.json`.
+* Removes PWA manifest links from `dist/extension/index.html` to maintain MV3 compliance.
 
 ### Build Both Targets
 ```bash
@@ -227,11 +235,11 @@ npm run build:all
    ```bash
    npm run deploy:firebase
    ```
-Firebase Hosting serves `dist/pwa` configured in [firebase.json](file:///home/self/git/web-recording/firebase.json) with strict Content-Security-Policy headers, frame protections, and service worker caching rules.
+Firebase Hosting serves `dist/pwa` using configuration in [firebase.json](firebase.json) with HTTP security headers, frame protections, and service worker caching rules.
 
 ### Installing in Google Chrome (Extension Unpacked Mode)
 
-1. Run the extension build:
+1. Build the extension target:
    ```bash
    npm run build:extension
    ```
@@ -241,5 +249,5 @@ Firebase Hosting serves `dist/pwa` configured in [firebase.json](file:///home/se
    ```
 3. Enable **Developer mode** (toggle in upper right).
 4. Click **Load unpacked**.
-5. Select the `dist/extension` folder inside this repository.
-6. Click the VoiceStudio icon in your Chrome extensions menu to launch the recording studio popup.
+5. Select the `dist/extension` directory.
+6. Click the VoiceStudio icon in the Chrome toolbar to open the extension popup.
