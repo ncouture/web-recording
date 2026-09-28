@@ -1,7 +1,12 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # scripts/install-hooks.sh
 # Installs git pre-commit hooks and ensures ratchet is ready.
-set -euo pipefail
+set -eu
+
+# Skip hook installation in CI environments
+if [ -n "${CI:-}" ]; then
+  exit 0
+fi
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "${REPO_ROOT}"
